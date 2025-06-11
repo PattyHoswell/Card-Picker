@@ -82,6 +82,10 @@ namespace Patty_CardPicker_MOD
                 "Umbra",
                 "Melting Remnant",
             };
+            var customFaction = GetAllGameData()
+                               .GetAllClassDatas()
+                               .Where(data => !factions.Contains(data.Cheat_GetNameEnglish()));
+            factions.AddRange(customFaction.Select(data => data.Cheat_GetNameEnglish()));
             Dictionary<ClassData, ConfigFile> configFilesDict = new Dictionary<ClassData, ConfigFile>();
             ConfigFile clanlessConfig = new ConfigFile(Path.Combine(Paths.ConfigPath, PluginInfo.Name, "Clanless.cfg"), true);
             foreach (var faction in factions)
@@ -100,13 +104,10 @@ namespace Patty_CardPicker_MOD
             foreach (CardData card in GetAllCardDatas())
             {
                 ConfigFile config;
-                if (card.GetLinkedClass() == null)
+                if (card.GetLinkedClass() == null || 
+                    !configFilesDict.TryGetValue(card.GetLinkedClass(), out config))
                 {
                     config = clanlessConfig;
-                }
-                else
-                {
-                    config = configFilesDict[card.GetLinkedClass()];
                 }
                 Entries[card] = config.Bind<int>(
                     new ConfigDefinition("Cards Amount", card.name),

@@ -283,6 +283,10 @@ namespace Patty_CardPicker_MOD
                 "Umbra",
                 "Melting Remnant",
             };
+            var customFaction = Plugin.GetAllGameData()
+                                      .GetAllClassDatas()
+                                      .Where(data => !factions.Contains(data.Cheat_GetNameEnglish()));
+            factions.AddRange(customFaction.Select(data => data.Cheat_GetNameEnglish()));
             foreach (var faction in factions)
             {
                 switch (faction)
