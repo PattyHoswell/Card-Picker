@@ -82,6 +82,8 @@ namespace Patty_CardPicker_MOD
             {
                 var cardButton = cardButtons[i];
                 cardButton.transform.SetSiblingIndex(i);
+                cardButton.tooltipSide = i % 4 >= 2 ? TooltipSide.Left : TooltipSide.Right;
+                cardButton.cardUI.SetTooltipSide(cardButton.tooltipSide);
             }
         }
         internal void Close()
