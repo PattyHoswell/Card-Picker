@@ -23,7 +23,6 @@ namespace Patty_CardPicker_MOD
         TextMeshProUGUI title, warning;
         bool initialized, initializedOptions;
         internal ScrollRect scrollRect;
-        internal RunSetupScreen SetupScreen { get; set; }
         internal static CardSelectionDialog Instance { get; set; }
         internal CardButtonUI focusedButton;
 
@@ -101,32 +100,51 @@ namespace Patty_CardPicker_MOD
             }
             initialized = true;
 
+            InitializeBasicComponents();
+            SetupDialogAndScrollView();
+            SetupTitleAndWarning();
+            SetupStarterCardsButton();
+            SetupCardGridLayout();
+            SetupCardPreviewTemplate();
+            SetupCloseButton();
+            SetupResetButton();
+        }
+
+        private void InitializeBasicComponents()
+        {
             Instance = this;
             name = nameof(CardSelectionDialog);
             dialog = GetComponentInChildren<ScreenDialog>();
             scrollRect = GetComponentInChildren<ScrollRect>();
+        }
 
+        private void SetupDialogAndScrollView()
+        {
+            Transform originalCloseButton = transform.Find("Dialog/CloseButton");
+            DestroyImmediate(originalCloseButton.GetComponent<GameUISelectableButton>());
+        }
 
-            Transform ogCloseTr = transform.Find("Dialog").Find("CloseButton");
-            DestroyImmediate(ogCloseTr.GetComponent<GameUISelectableButton>());
+        private void SetupTitleAndWarning()
+        {
+            var instructions = dialog.transform.Find("Content/Info and Preview/Instructions");
 
-            var instructions = dialog.transform.Find("Content")
-                                               .Find("Info and Preview")
-                                               .Find("Instructions");
-
-            title = instructions.Find("Instructions label")
-                                .GetComponent<TextMeshProUGUI>();
+            title = instructions.Find("Instructions label").GetComponent<TextMeshProUGUI>();
             DestroyImmediate(title.GetComponent<Localize>());
+            title.text = "Choose any cards to customize your run.";
 
-            warning = instructions.Find("Warning layout")
-                                  .Find("Warning label")
-                                  .GetComponent<TextMeshProUGUI>();
+            warning = instructions.Find("Warning layout/Warning label").GetComponent<TextMeshProUGUI>();
             DestroyImmediate(warning.GetComponent<Localize>());
+            warning.text = "Not every card here has been tested, enabled card will be sorted at the top. " +
+                           "Re-open the menu to sort it, left click to increase the amount, " +
+                           "right click to decrease.";
+        }
 
+        private void SetupStarterCardsButton()
+        {
             var uiFooter = FindObjectOfType<UIFooter>();
             Transform swapChampButton = uiFooter.transform.Find("Swap Champion Button");
-
             Transform starterCardsButton = Instantiate(swapChampButton, uiFooter.transform);
+
             var starterLabel = starterCardsButton.Find("Label").GetComponent<TextMeshProUGUI>();
             DestroyImmediate(starterLabel.GetComponent<Localize>());
             starterLabel.fontSizeMin = starterLabel.fontSizeMax;
@@ -135,102 +153,142 @@ namespace Patty_CardPicker_MOD
 
             starterCardsButton.GetComponent<GameUISelectableButton>().onClick.AddListener(() =>
             {
+                SoundManager.PlaySfxSignal.Dispatch("UI_Click");
                 enabled = true;
                 gameObject.SetActive(true);
             });
+        }
 
-            title.text = "Choose any cards to customize your run.";
-            warning.text = "Not every card here has been tested, enabled card will be sorted at the top. Re-open the menu to sort it, " +
-                           "left click to increase the amount, right click to decrease.";
-
-            var runSetupScreen = SetupScreen;
-            if (runSetupScreen == null)
-            {
-                runSetupScreen = FindObjectOfType<RunSetupScreen>();
-            }
+        private void SetupCardGridLayout()
+        {
             var contentGroup = scrollRect.content.GetComponent<GridLayoutGroup>();
             contentGroup.cellSize = new Vector2(312, 450);
             contentGroup.constraintCount = 4;
-
             DestroyImmediate(scrollRect.content.GetChild(0).gameObject);
+        }
 
+        private void SetupCardPreviewTemplate()
+        {
             var clonedCardPreview = Instantiate(FindObjectOfType<CardUI>(), transform);
-
             layout = clonedCardPreview.gameObject.AddComponent<CardButtonUI>();
             layout.transform.localScale = Vector3.one;
             layout.gameObject.SetActive(false);
+        }
 
-            closeButton = ogCloseTr.gameObject.AddComponent<Button>();
+        private void SetupCloseButton()
+        {
+            Transform originalCloseButton = transform.Find("Dialog/CloseButton");
+            closeButton = originalCloseButton.gameObject.AddComponent<Button>();
             closeButton.targetGraphic = closeButton.transform.Find("Target Graphic").GetComponent<Image>();
             closeButton.gameObject.SetActive(true);
             closeButton.onClick = new Button.ButtonClickedEvent();
-            closeButton.onClick.AddListener(delegate ()
+            closeButton.onClick.AddListener(() =>
             {
                 SoundManager.PlaySfxSignal.Dispatch("UI_Click");
                 Close();
             });
+        }
 
+        private void SetupResetButton()
+        {
             Button resetButton = Instantiate(closeButton, transform);
-            resetButton.transform.localPosition = new Vector3(0, -460, 0);
+            resetButton.transform.localPosition = new Vector3(200, -460, 0);
+
             DestroyImmediate(resetButton.targetGraphic.gameObject);
             DestroyImmediate(resetButton.transform.Find("Image close icon").gameObject);
-            TextMeshProUGUI resetLabel = Instantiate(starterLabel, resetButton.transform);
-            resetLabel.text = "Reset All Count";
 
-            resetButton.targetGraphic = Instantiate(starterCardsButton.Find("Target Graphic").GetComponent<Image>(), resetButton.transform);
+            var starterLabel = FindObjectOfType<UIFooter>().transform.Find("Swap Champion Button/Label").GetComponent<TextMeshProUGUI>();
+            TextMeshProUGUI resetLabel = Instantiate(starterLabel, resetButton.transform);
+            DestroyImmediate(resetLabel.GetComponent<Localize>());
+
+            resetLabel.name = "Label";
+            resetLabel.fontSizeMin = resetLabel.fontSizeMax;
+            resetLabel.fontSize = resetLabel.fontSizeMax;
+            resetLabel.text = "Reset Current Page";
+
+            resetButton.targetGraphic = Instantiate(
+                FindObjectOfType<UIFooter>().transform.Find("Swap Champion Button/Target Graphic").GetComponent<Image>(),
+                resetButton.transform
+            );
             resetButton.targetGraphic.GetComponent<RectTransform>().sizeDelta = new Vector2(300, 112);
             resetButton.targetGraphic.transform.SetAsFirstSibling();
+
+            resetButton.onClick = new Button.ButtonClickedEvent();
             resetButton.onClick.AddListener(() =>
             {
                 SoundManager.PlaySfxSignal.Dispatch("UI_Click");
-                foreach (CardButtonUI buttonUI in cardButtons)
-                {
-                    buttonUI.SetAmount(0);
-                }
-                ResetOrder();
+                ResetAllCardCounts();
             });
 
             RectTransform resetButtonHitboxTr = resetButton.transform.Find("Hitbox Invis").GetComponent<RectTransform>();
             resetButtonHitboxTr.localRotation = Quaternion.identity;
             resetButtonHitboxTr.sizeDelta = new Vector2(280, 0);
 
+            var resetAll = Instantiate(resetButton, transform);
+            resetAll.transform.localPosition = new Vector3(-200, -460, 0);
+            resetAll.transform.Find("Label").GetComponent<TextMeshProUGUI>().text = "Reset All";
+
+            resetAll.onClick = new Button.ButtonClickedEvent();
+            resetAll.onClick.AddListener(() =>
+            {
+                SoundManager.PlaySfxSignal.Dispatch("UI_Click");
+                foreach (var entry in Plugin.Entries)
+                {
+                    entry.Value.Value = 0;
+                }
+                ResetAllCardCounts();
+            });
         }
-        void LoadCards(CardType cardType, CollectableRarity rarity, ClassData faction)
+
+        private void ResetAllCardCounts()
+        {
+            foreach (CardButtonUI buttonUI in cardButtons)
+            {
+                buttonUI.SetAmount(0);
+            }
+            ResetOrder();
+        }
+
+        private void LoadCards(CardType cardType, CollectableRarity rarity, ClassData faction)
         {
             IEnumerable<CardData> cards = Plugin.GetAllCardDatas()
                                                 .Where(card => card.GetLinkedClass() == faction);
-
             // -9999 is value for All
             if ((int)cardType != -9999)
             {
                 cards = cards.Where(card => card.GetCardType() == cardType);
             }
+
             if ((int)rarity != -9999)
             {
                 cards = cards.Where(card => card.GetRarity() == rarity);
             }
 
-            cards = cards.Where(card => AssetLoadingManager.IsOwnerInBaseGameOrInstalledDlc(card, AllGameManagers.Instance.GetSaveManager()));
             AssetLoadingManager.GetInst().LoadCardsForCompendium(cards, delegate (IAddressableAssetOwner owner)
             {
                 return AssetLoadingManager.IsOwnerInBaseGameOrInstalledDlc(owner, AllGameManagers.Instance.GetSaveManager());
-            }, delegate
+            }, () => CreateCardButtons(cards)
+            );
+        }
+
+        private void CreateCardButtons(IEnumerable<CardData> cards)
+        {
+            foreach (var card in cardButtons)
             {
-                foreach (var card in cardButtons)
-                {
-                    DestroyImmediate(card.gameObject);
-                }
-                cardButtons.Clear();
-                foreach (var card in cards)
-                {
-                    var cardButton = Instantiate(layout, scrollRect.content);
-                    cardButton.Set(card, this);
-                    cardButton.gameObject.SetActive(true);
-                    cardButton.transform.localScale = Vector3.one;
-                    cardButtons.Add(cardButton);
-                }
-                ResetOrder();
-            });
+                DestroyImmediate(card.gameObject);
+            }
+            cardButtons.Clear();
+
+            foreach (var card in cards)
+            {
+                var cardButton = Instantiate(layout, scrollRect.content);
+                cardButton.Set(card, this);
+                cardButton.gameObject.SetActive(true);
+                cardButton.transform.localScale = Vector3.one;
+                cardButtons.Add(cardButton);
+            }
+
+            ResetOrder();
         }
         IEnumerator CreateDropdownList()
         {
@@ -243,9 +301,11 @@ namespace Patty_CardPicker_MOD
             }
             DestroyImmediate(preview.GetComponent<HorizontalLayoutGroup>());
             preview.gameObject.AddComponent<VerticalLayoutGroup>();
+
+            var ogDropdown = FindObjectOfType<GameUISelectableDropdown>(true);
             GameUISelectableDropdown CreateDropdownWithOptions(List<string> options)
             {
-                var dropdown = Instantiate(FindObjectOfType<GameUISelectableDropdown>(true), preview);
+                var dropdown = Instantiate(ogDropdown, preview);
                 dropdown.SetOptions(options);
                 dropdown.onClick.AddListener(delegate ()
                 {
@@ -376,18 +436,30 @@ namespace Patty_CardPicker_MOD
 
             factionDropdown.optionChosenSignal.AddListener(delegate (int index, string optionName)
             {
+                if (selectedFaction == CardFactionOptions[optionName])
+                {
+                    return;
+                }
                 selectedFaction = CardFactionOptions[optionName];
                 LoadCards(selectedType, selectedRarity, selectedFaction);
             });
 
             cardTypeDropdown.optionChosenSignal.AddListener(delegate (int index, string optionName)
             {
+                if (selectedType == CardTypeOptions[optionName])
+                {
+                    return;
+                }
                 selectedType = CardTypeOptions[optionName];
                 LoadCards(selectedType, selectedRarity, selectedFaction);
             });
 
             cardRarityDropdown.optionChosenSignal.AddListener(delegate (int index, string optionName)
             {
+                if (selectedRarity == CardRarityOptions[optionName])
+                {
+                    return;
+                }
                 selectedRarity = CardRarityOptions[optionName];
                 LoadCards(selectedType, selectedRarity, selectedFaction);
             });
@@ -437,17 +509,17 @@ namespace Patty_CardPicker_MOD
 
             Vector3 sourceWorldPos = focusedCardRectTransform.position;
 
-            RectTransform targetParent = focusedTooltipRectTransform.parent as RectTransform;
+            RectTransform targetParent = (RectTransform)focusedTooltipRectTransform.parent;
             RectTransformUtility.ScreenPointToLocalPointInRectangle(
                 targetParent,
                 RectTransformUtility.WorldToScreenPoint(null, sourceWorldPos),
                 null,
                 out Vector2 localPos
             );
-            var offset = new Vector2(900, -500);
+            var offset = new Vector2(900, -550);
             if (focusedButton.tooltipSide == TooltipSide.Left)
             {
-                offset = new Vector2(1000, -500);
+                offset = new Vector2(1020, -550);
             }
             focusedTooltipRectTransform.anchoredPosition = localPos + offset;
         }

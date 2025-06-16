@@ -33,7 +33,7 @@ namespace Patty_CardPicker_MOD
             }
 
             EnableOnChallenge = Config.Bind<bool>(new ConfigDefinition("Challenge Run", "Enable on Challenge Run"), true,
-                                                  new ConfigDescription("Turn this on to start Challenge modes with the relic you chose in the menu."));
+                                                  new ConfigDescription("Turn this on to start Challenge modes with the card you chose in the menu."));
 
 
             ShowAllCards = Config.Bind<bool>(

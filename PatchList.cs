@@ -23,22 +23,69 @@ namespace Patty_CardPicker_MOD
         [HarmonyPostfix, HarmonyPatch(typeof(GameStateManager), nameof(GameStateManager.StartGame))]
         public static void StartGame(RunType runType)
         {
-            if (runType == RunType.MalickaChallenge &&
-                (bool)Plugin.EnableOnChallenge.BoxedValue == false)
+            if (runType == RunType.MalickaChallenge && 
+                !Plugin.EnableOnChallenge.Value)
             {
                 return;
             }
-            foreach (KeyValuePair<CardData, ConfigEntry<int>> pickedCard in Plugin.Entries)
+
+            SaveManager saveManager = AllGameManagers.Instance.GetSaveManager();
+            RelicManager relicManager = AllGameManagers.Instance.GetRelicManager();
+
+            foreach (var cardEntry in Plugin.Entries)
             {
-                if ((int)pickedCard.Value.BoxedValue <= 0)
+                if (cardEntry.Value.Value <= 0)
                 {
                     continue;
                 }
-                LoadingScreen.AddTask(new LoadAdditionalCards(pickedCard.Key, true, LoadingScreen.DisplayStyle.Spinner, delegate
+
+                CardData cardData = cardEntry.Key;
+
+                /* You can enable this if you want. In my case I can't.
+                 * Because what if it tries to add a card that can't be shown in the LogBook.
+                 * There's too much to consider for this to be worth it for such little value.
+                 */
+                // saveManager.GetMetagameSave().MarkCardDiscovered(cardData);
+
+                var mainClass = saveManager.GetMainClass();
+                var subClass = saveManager.GetSubClass();
+                var enhancerPool = mainClass.GetRandomDraftEnhancerPool() != null ? 
+                                   mainClass.GetRandomDraftEnhancerPool() : 
+                                   subClass.GetRandomDraftEnhancerPool();
+
+                for (int i = 0; i < cardEntry.Value.Value; i++)
                 {
-                    AllGameManagers.Instance.GetSaveManager().AddCardToDeck(pickedCard.Key, null, true, (int)pickedCard.Value.BoxedValue - 1);
-                }));
+                    CardState cardState = saveManager.AddCardToDeck(cardData, null, true);
+                    relicManager.ApplyStartingUpgradeToDraftCard(cardState, false);
+
+                    if (enhancerPool != null)
+                    {
+                        using (GenericPools.GetList(out List<EnhancerData> enhancers))
+                        {
+                            CardUpgradeData upgradeData = enhancerPool.GetAllChoices(enhancers)
+                                                          .RandomElement(RngId.Rewards)
+                                                          .GetEffects()[0]
+                                                          .GetParamCardUpgradeData();
+
+                            var cardUpgrade = new CardUpgradeState();
+                            cardUpgrade.Setup(upgradeData);
+                            cardState.Upgrade(cardUpgrade, saveManager, true);
+                        }
+                    }
+
+                    relicManager.ApplyCardStateModifiers(cardState);
+                }
             }
+        }
+        [HarmonyPostfix, HarmonyPatch(typeof(SaveManager), nameof(SaveManager.AddCardToDeck))]
+        public static void AddCardToDeck(CardData cardData, CardStateModifiers startingModifiers)
+        {
+            if (cardData == null ||
+                startingModifiers == null)
+            {
+                return;
+            }
+            Plugin.LogSource.LogInfo(Environment.StackTrace);
         }
         [HarmonyPostfix, HarmonyPatch(typeof(LoadScreen), "StartLoadingScreen")]
         public static void StartLoadingScreen(LoadScreen __instance, ref ScreenManager.ScreenActiveCallback ___screenActiveCallback)
@@ -48,7 +95,7 @@ namespace Patty_CardPicker_MOD
             {
                 ___screenActiveCallback += delegate (IScreen screen)
                 {
-                    var runSetupScreen = UnityEngine.Object.FindObjectOfType<RunSetupScreen>();
+                    var runSetupScreen = (RunSetupScreen)screen;
                     var mutatorSelectionDialog = (MutatorSelectionDialog)AccessTools.Field(typeof(RunSetupScreen), "mutatorSelectionDialog")
                                                                                     .GetValue(runSetupScreen);
                     if (mutatorSelectionDialog == null)
@@ -59,7 +106,6 @@ namespace Patty_CardPicker_MOD
 
                     var clonedDialog = UnityEngine.Object.Instantiate(mutatorSelectionDialog, mutatorSelectionDialog.transform.parent.parent);
                     CardSelectionDialog.Instance = clonedDialog.gameObject.AddComponent<CardSelectionDialog>();
-                    CardSelectionDialog.Instance.SetupScreen = runSetupScreen;
                     CardSelectionDialog.Instance.name = nameof(CardSelectionDialog);
                     CardSelectionDialog.Instance.Setup();
                     UnityEngine.Object.DestroyImmediate(clonedDialog.gameObject.GetComponent<MutatorSelectionDialog>());
