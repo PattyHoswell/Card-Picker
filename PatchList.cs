@@ -77,16 +77,6 @@ namespace Patty_CardPicker_MOD
                 }
             }
         }
-        [HarmonyPostfix, HarmonyPatch(typeof(SaveManager), nameof(SaveManager.AddCardToDeck))]
-        public static void AddCardToDeck(CardData cardData, CardStateModifiers startingModifiers)
-        {
-            if (cardData == null ||
-                startingModifiers == null)
-            {
-                return;
-            }
-            Plugin.LogSource.LogInfo(Environment.StackTrace);
-        }
         [HarmonyPostfix, HarmonyPatch(typeof(LoadScreen), "StartLoadingScreen")]
         public static void StartLoadingScreen(LoadScreen __instance, ref ScreenManager.ScreenActiveCallback ___screenActiveCallback)
         {
