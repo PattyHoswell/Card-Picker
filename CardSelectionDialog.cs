@@ -11,6 +11,8 @@ using BepInEx.Configuration;
 using TMPro;
 using I2.Loc;
 using System.Collections;
+using System.Collections.Specialized;
+using HarmonyLib;
 
 namespace Patty_CardPicker_MOD
 {
@@ -23,6 +25,8 @@ namespace Patty_CardPicker_MOD
         TextMeshProUGUI title, warning;
         bool initialized, initializedOptions;
         internal ScrollRect scrollRect;
+        internal Image bg;
+        internal static readonly Color BGColor = new Color(0, 0, 0, 0.902f);
         internal static CardSelectionDialog Instance { get; set; }
         internal CardButtonUI focusedButton;
 
@@ -30,9 +34,10 @@ namespace Patty_CardPicker_MOD
         internal CollectableRarity selectedRarity = CollectableRarity.Common;
         internal CardType selectedType = CardType.Monster;
 
-        internal readonly Dictionary<string, ClassData> CardFactionOptions = new Dictionary<string, ClassData>();
-        internal readonly Dictionary<string, CollectableRarity> CardRarityOptions = new Dictionary<string, CollectableRarity>();
-        internal readonly Dictionary<string, CardType> CardTypeOptions = new Dictionary<string, CardType>();
+        internal readonly HashSet<string> FactionNames = new HashSet<string>();
+        internal readonly OrderedDictionary CardFactionOptions = new OrderedDictionary();
+        internal readonly OrderedDictionary CardTypeOptions = new OrderedDictionary();
+        internal readonly OrderedDictionary CardRarityOptions = new OrderedDictionary();
         void Awake()
         {
             Setup();
@@ -100,14 +105,17 @@ namespace Patty_CardPicker_MOD
             }
             initialized = true;
 
+            bg = transform.Find("Dialog Overlay").GetComponent<Image>();
+            var uiFooter = FindObjectOfType<UIFooter>();
             InitializeBasicComponents();
             SetupDialogAndScrollView();
             SetupTitleAndWarning();
-            SetupStarterCardsButton();
+            SetupStarterCardsButton(uiFooter);
             SetupCardGridLayout();
             SetupCardPreviewTemplate();
             SetupCloseButton();
-            SetupResetButton();
+            SetupResetButton(uiFooter);
+            SetupOptions();
         }
 
         private void InitializeBasicComponents()
@@ -122,6 +130,7 @@ namespace Patty_CardPicker_MOD
         {
             Transform originalCloseButton = transform.Find("Dialog/CloseButton");
             DestroyImmediate(originalCloseButton.GetComponent<GameUISelectableButton>());
+            DestroyImmediate(scrollRect.content.GetChild(0).gameObject);
         }
 
         private void SetupTitleAndWarning()
@@ -139,9 +148,8 @@ namespace Patty_CardPicker_MOD
                            "right click to decrease.";
         }
 
-        private void SetupStarterCardsButton()
+        private void SetupStarterCardsButton(UIFooter uiFooter)
         {
-            var uiFooter = FindObjectOfType<UIFooter>();
             Transform swapChampButton = uiFooter.transform.Find("Swap Champion Button");
             Transform starterCardsButton = Instantiate(swapChampButton, uiFooter.transform);
 
@@ -164,12 +172,12 @@ namespace Patty_CardPicker_MOD
             var contentGroup = scrollRect.content.GetComponent<GridLayoutGroup>();
             contentGroup.cellSize = new Vector2(312, 450);
             contentGroup.constraintCount = 4;
-            DestroyImmediate(scrollRect.content.GetChild(0).gameObject);
         }
 
         private void SetupCardPreviewTemplate()
         {
             var clonedCardPreview = Instantiate(FindObjectOfType<CardUI>(), transform);
+            clonedCardPreview.name = "CardUIPrefab";
             layout = clonedCardPreview.gameObject.AddComponent<CardButtonUI>();
             layout.transform.localScale = Vector3.one;
             layout.gameObject.SetActive(false);
@@ -189,15 +197,16 @@ namespace Patty_CardPicker_MOD
             });
         }
 
-        private void SetupResetButton()
+        private void SetupResetButton(UIFooter uiFooter)
         {
             Button resetButton = Instantiate(closeButton, transform);
-            resetButton.transform.localPosition = new Vector3(200, -460, 0);
+            resetButton.name = "Reset Button";
+            resetButton.transform.localPosition = new Vector2(0, -460);
 
             DestroyImmediate(resetButton.targetGraphic.gameObject);
             DestroyImmediate(resetButton.transform.Find("Image close icon").gameObject);
 
-            var starterLabel = FindObjectOfType<UIFooter>().transform.Find("Swap Champion Button/Label").GetComponent<TextMeshProUGUI>();
+            var starterLabel = uiFooter.transform.Find("Swap Champion Button/Label").GetComponent<TextMeshProUGUI>();
             TextMeshProUGUI resetLabel = Instantiate(starterLabel, resetButton.transform);
             DestroyImmediate(resetLabel.GetComponent<Localize>());
 
@@ -207,9 +216,10 @@ namespace Patty_CardPicker_MOD
             resetLabel.text = "Reset Current Page";
 
             resetButton.targetGraphic = Instantiate(
-                FindObjectOfType<UIFooter>().transform.Find("Swap Champion Button/Target Graphic").GetComponent<Image>(),
+                uiFooter.transform.Find("Swap Champion Button/Target Graphic").GetComponent<Image>(),
                 resetButton.transform
             );
+            resetButton.targetGraphic.name = "Target Graphic";
             resetButton.targetGraphic.GetComponent<RectTransform>().sizeDelta = new Vector2(300, 112);
             resetButton.targetGraphic.transform.SetAsFirstSibling();
 
@@ -225,7 +235,8 @@ namespace Patty_CardPicker_MOD
             resetButtonHitboxTr.sizeDelta = new Vector2(280, 0);
 
             var resetAll = Instantiate(resetButton, transform);
-            resetAll.transform.localPosition = new Vector3(-200, -460, 0);
+            resetAll.name = "Reset All Button";
+            resetAll.transform.localPosition = new Vector2(-500, -460);
             resetAll.transform.Find("Label").GetComponent<TextMeshProUGUI>().text = "Reset All";
 
             resetAll.onClick = new Button.ButtonClickedEvent();
@@ -238,6 +249,109 @@ namespace Patty_CardPicker_MOD
                 }
                 ResetAllCardCounts();
             });
+
+
+            var runSetupScreen = (RunSetupScreen)AllGameManagers.Instance.GetScreenManager().GetScreen(ScreenName.RunSetup);
+            var mutatorSelectionDialog = (MutatorSelectionDialog)AccessTools.Field(typeof(RunSetupScreen), "mutatorSelectionDialog")
+                                                                            .GetValue(runSetupScreen);
+            var clonedDialog = Instantiate(mutatorSelectionDialog, mutatorSelectionDialog.transform.parent.parent);
+            var modOptionDialog = clonedDialog.gameObject.AddComponent<ModOptionDialog>();
+            modOptionDialog.cardSelectionDialog = this;
+            modOptionDialog.Setup();
+
+            var advanced = Instantiate(resetButton, transform);
+            advanced.name = "Advanced Button";
+            advanced.transform.localPosition = new Vector2(500, -460);
+            advanced.transform.Find("Label").GetComponent<TextMeshProUGUI>().text = "Options";
+
+            advanced.onClick = new Button.ButtonClickedEvent();
+            advanced.onClick.AddListener(() =>
+            {
+                SoundManager.PlaySfxSignal.Dispatch("UI_Click");
+                bg.color = new Color(0, 0, 0, 0.502f);
+                SetFocusCard(null);
+                modOptionDialog.Open();
+            });
+        }
+        private void SetupOptions()
+        {
+            var orderedClassTerms = Plugin.ClanNameTranslationTerm.Keys.Cast<string>().ToList();
+            var orderedClass = Plugin.ClanNameTranslationTerm.Values.Cast<string>().ToList();
+
+            var clanlessName = LocalizationManager.GetTranslation(orderedClassTerms.First());
+            CardFactionOptions[clanlessName] = null;
+            FactionNames.Add(clanlessName);
+
+            var allClassDatas = Plugin.GetAllGameData().GetAllClassDatas();
+            var orderedVanillaFactions = allClassDatas.Where(data => orderedClass.Contains(data.Cheat_GetNameEnglish()))
+                                                      .OrderBy(data => orderedClass.IndexOf(data.Cheat_GetNameEnglish()));
+
+            var orderedCustomFactions = allClassDatas.Where(data => !orderedClass.Contains(data.Cheat_GetNameEnglish()))
+                                                     .OrderBy(data => data.GetTitle());
+
+            foreach (var classData in orderedVanillaFactions.Union(orderedCustomFactions))
+            {
+                var title = classData.GetTitle();
+                FactionNames.Add(title);
+                CardFactionOptions[title] = classData;
+            }
+
+            foreach (DictionaryEntry cardRarity in Plugin.CardRarityTranslationTerm)
+            {
+                if (!LocalizationManager.TryGetTranslation((string)cardRarity.Key, out string translatedCardRarity))
+                {
+                    translatedCardRarity = (string)cardRarity.Value;
+                }
+                switch (cardRarity.Value)
+                {
+                    case "All":
+                        CardRarityOptions[translatedCardRarity] = (CollectableRarity)(-9999);
+                        break;
+                    case "Champion":
+                        CardRarityOptions[translatedCardRarity] = CollectableRarity.Champion;
+                        break;
+                    case "Common":
+                        CardRarityOptions[translatedCardRarity] = CollectableRarity.Common;
+                        break;
+                    case "Uncommon":
+                        CardRarityOptions[translatedCardRarity] = CollectableRarity.Uncommon;
+                        break;
+                    case "Rare":
+                        CardRarityOptions[translatedCardRarity] = CollectableRarity.Rare;
+                        break;
+                }
+            }
+            foreach (DictionaryEntry cardType in Plugin.CardTypeTranslationTerm)
+            {
+                if (!LocalizationManager.TryGetTranslation((string)cardType.Key, out string translatedCardType))
+                {
+                    translatedCardType = (string)cardType.Value;
+                }
+                switch (cardType.Value)
+                {
+                    case "All":
+                        CardTypeOptions[translatedCardType] = (CardType)(-9999);
+                        break;
+                    case "Unit":
+                        CardTypeOptions[translatedCardType] = CardType.Monster;
+                        break;
+                    case "Spell":
+                        CardTypeOptions[translatedCardType] = CardType.Spell;
+                        break;
+                    case "Equipment":
+                        CardTypeOptions[translatedCardType] = CardType.Equipment;
+                        break;
+                    case "Room":
+                        CardTypeOptions[translatedCardType] = CardType.TrainRoomAttachment;
+                        break;
+                    case "Blight":
+                        CardTypeOptions[translatedCardType] = CardType.Blight;
+                        break;
+                    case "Scourge":
+                        CardTypeOptions[translatedCardType] = CardType.Junk;
+                        break;
+                }
+            }
         }
 
         private void ResetAllCardCounts()
@@ -247,6 +361,11 @@ namespace Patty_CardPicker_MOD
                 buttonUI.SetAmount(0);
             }
             ResetOrder();
+        }
+
+        internal void RefreshCards()
+        {
+            LoadCards(selectedType, selectedRarity, selectedFaction);
         }
 
         private void LoadCards(CardType cardType, CollectableRarity rarity, ClassData faction)
@@ -290,6 +409,7 @@ namespace Patty_CardPicker_MOD
 
             ResetOrder();
         }
+
         IEnumerator CreateDropdownList()
         {
             var preview = dialog.transform.Find("Content")
@@ -303,10 +423,31 @@ namespace Patty_CardPicker_MOD
             preview.gameObject.AddComponent<VerticalLayoutGroup>();
 
             var ogDropdown = FindObjectOfType<GameUISelectableDropdown>(true);
-            GameUISelectableDropdown CreateDropdownWithOptions(List<string> options)
+            GameUISelectableDropdown CreateDropdownWithOptions(OrderedDictionary translatedTerms = null, 
+                                                               HashSet<string> customOptions = null)
             {
                 var dropdown = Instantiate(ogDropdown, preview);
-                dropdown.SetOptions(options);
+                using (GenericPools.GetList(out List<string> translatedOptions))
+                {
+                    if (translatedTerms != null)
+                    {
+                        foreach (DictionaryEntry option in translatedTerms)
+                        {
+                            string translatedName;
+                            if (!LocalizationManager.TryGetTranslation((string)option.Key, out translatedName))
+                            {
+                                translatedName = (string)option.Value;
+                            }
+                            translatedOptions.Add(translatedName);
+                        }
+                    }
+                    if (customOptions != null)
+                    {
+                        translatedOptions.AddRange(customOptions);
+                    }
+                    translatedOptions.RemoveDuplicates();
+                    dropdown.SetOptions(translatedOptions);
+                }
                 dropdown.onClick.AddListener(delegate ()
                 {
                     InputManager.Inst.TryGetSignaledInputMapping(InputManager.Controls.Submit, out CoreInputControlMapping mapping);
@@ -329,106 +470,9 @@ namespace Patty_CardPicker_MOD
                     });
                 }
             }
-            var factions = new List<string>
-            {
-                "Clanless",
-                "Banished",
-                "Pyreborne",
-                "Luna Coven",
-                "Underlegion",
-                "Lazarus League",
-                "Hellhorned",
-                "Awoken",
-                "Stygian Guard",
-                "Umbra",
-                "Melting Remnant",
-            };
-            var customFaction = Plugin.GetAllGameData()
-                                      .GetAllClassDatas()
-                                      .Where(data => !factions.Contains(data.Cheat_GetNameEnglish()));
-            factions.AddRange(customFaction.Select(data => data.Cheat_GetNameEnglish()));
-            foreach (var faction in factions)
-            {
-                switch (faction)
-                {
-                    case "Clanless":
-                        CardFactionOptions[faction] = null;
-                        break;
-                    default:
-                        CardFactionOptions[faction] = Plugin.GetAllGameData().GetAllClassDatas()
-                                                                             .First(data => data.Cheat_GetNameEnglish() == faction);
-                        break;
-                }
-            }
-            var cardTypes = new List<string>
-            {
-                "All",
-                "Unit",
-                "Spell",
-                "Equipment",
-                "Room",
-                "Blight",
-                "Scourge",
-            };
-            foreach (var cardType in cardTypes)
-            {
-                switch (cardType)
-                {
-                    case "All":
-                        CardTypeOptions[cardType] = (CardType)(-9999);
-                        break;
-                    case "Unit":
-                        CardTypeOptions[cardType] = CardType.Monster;
-                        break;
-                    case "Spell":
-                        CardTypeOptions[cardType] = CardType.Spell;
-                        break;
-                    case "Equipment":
-                        CardTypeOptions[cardType] = CardType.Equipment;
-                        break;
-                    case "Room":
-                        CardTypeOptions[cardType] = CardType.TrainRoomAttachment;
-                        break;
-                    case "Blight":
-                        CardTypeOptions[cardType] = CardType.Blight;
-                        break;
-                    case "Scourge":
-                        CardTypeOptions[cardType] = CardType.Junk;
-                        break;
-                }
-            }
-            var cardRarities = new List<string>
-            {
-                "All",
-                "Champion",
-                "Common",
-                "Uncommon",
-                "Rare",
-            };
-            foreach (var cardRarity in cardRarities)
-            {
-                switch (cardRarity)
-                {
-                    case "All":
-                        CardRarityOptions[cardRarity] = (CollectableRarity)(-9999);
-                        break;
-                    case "Champion":
-                        CardRarityOptions[cardRarity] = CollectableRarity.Champion;
-                        break;
-                    case "Common":
-                        CardRarityOptions[cardRarity] = CollectableRarity.Common;
-                        break;
-                    case "Uncommon":
-                        CardRarityOptions[cardRarity] = CollectableRarity.Uncommon;
-                        break;
-                    case "Rare":
-                        CardRarityOptions[cardRarity] = CollectableRarity.Rare;
-                        break;
-                }
-            }
-            var factionDropdown = CreateDropdownWithOptions(factions);
-            var cardTypeDropdown = CreateDropdownWithOptions(cardTypes);
-            var cardRarityDropdown = CreateDropdownWithOptions(cardRarities);
+            var factionDropdown = CreateDropdownWithOptions(customOptions: FactionNames);
+            var cardTypeDropdown = CreateDropdownWithOptions(Plugin.CardTypeTranslationTerm);
+            var cardRarityDropdown = CreateDropdownWithOptions(Plugin.CardRarityTranslationTerm);
             yield return null;
             SetupDropdownButtonListeners(factionDropdown);
             SetupDropdownButtonListeners(cardTypeDropdown);
@@ -436,40 +480,40 @@ namespace Patty_CardPicker_MOD
 
             factionDropdown.optionChosenSignal.AddListener(delegate (int index, string optionName)
             {
-                if (selectedFaction == CardFactionOptions[optionName])
+                if (selectedFaction == (ClassData)CardFactionOptions[optionName])
                 {
                     return;
                 }
-                selectedFaction = CardFactionOptions[optionName];
+                selectedFaction = (ClassData)CardFactionOptions[optionName];
                 LoadCards(selectedType, selectedRarity, selectedFaction);
             });
 
             cardTypeDropdown.optionChosenSignal.AddListener(delegate (int index, string optionName)
             {
-                if (selectedType == CardTypeOptions[optionName])
+                if (selectedType == (CardType)CardTypeOptions[optionName])
                 {
                     return;
                 }
-                selectedType = CardTypeOptions[optionName];
+                selectedType = (CardType)CardTypeOptions[optionName];
                 LoadCards(selectedType, selectedRarity, selectedFaction);
             });
 
             cardRarityDropdown.optionChosenSignal.AddListener(delegate (int index, string optionName)
             {
-                if (selectedRarity == CardRarityOptions[optionName])
+                if (selectedRarity == (CollectableRarity)CardRarityOptions[optionName])
                 {
                     return;
                 }
-                selectedRarity = CardRarityOptions[optionName];
+                selectedRarity = (CollectableRarity)CardRarityOptions[optionName];
                 LoadCards(selectedType, selectedRarity, selectedFaction);
             });
 
             factionDropdown.SetIndex(1);
             cardTypeDropdown.SetIndex(1);
             cardRarityDropdown.SetIndex(0);
-            selectedFaction = CardFactionOptions["Banished"];
-            selectedType = CardTypeOptions["Unit"];
-            selectedRarity = CardRarityOptions["All"];
+            selectedFaction = (ClassData)CardFactionOptions[1];
+            selectedType = (CardType)CardTypeOptions[1];
+            selectedRarity = (CollectableRarity)CardRarityOptions[0];
 
             LoadCards(selectedType, selectedRarity, selectedFaction);
             preview.gameObject.SetActive(true);
@@ -493,6 +537,11 @@ namespace Patty_CardPicker_MOD
             cardButton.cardUI.SetFocus(null, true, CardTooltipContainer.LoreTooltipSetting.Never, false);
             UpdateTooltipPosition();
         }
+        void LateUpdate()
+        {
+            UpdateTooltipPosition();
+        }
+        
         void UpdateTooltipPosition()
         {
             if (focusedButton == null)
@@ -501,7 +550,6 @@ namespace Patty_CardPicker_MOD
             }
             var focusedTooltipRectTransform = (RectTransform)focusedButton.tooltip.transform;
             var focusedCardRectTransform = (RectTransform)focusedButton.cardUI.transform;
-            focusedTooltipRectTransform.anchoredPosition = focusedCardRectTransform.anchoredPosition;
             focusedTooltipRectTransform.anchorMin = focusedCardRectTransform.anchorMin;
             focusedTooltipRectTransform.anchorMax = focusedCardRectTransform.anchorMax;
             focusedTooltipRectTransform.pivot = focusedCardRectTransform.pivot;
@@ -522,14 +570,6 @@ namespace Patty_CardPicker_MOD
                 offset = new Vector2(1020, -550);
             }
             focusedTooltipRectTransform.anchoredPosition = localPos + offset;
-        }
-        void LateUpdate()
-        {
-            if (focusedButton == null)
-            {
-                return;
-            }
-            UpdateTooltipPosition();
         }
     }
 }

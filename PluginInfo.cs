@@ -10,6 +10,6 @@ namespace Patty_CardPicker_MOD
     {
         public const string GUID = "Patty_CardPicker_MOD";
         public const string Name = "Card Picker";
-        public const string Version = "1.1.1";
+        public const string Version = "2.0.0";
     }
 }

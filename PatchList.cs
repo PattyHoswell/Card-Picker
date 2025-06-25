@@ -28,6 +28,7 @@ namespace Patty_CardPicker_MOD
             {
                 return;
             }
+            Plugin.CardsAddedByThisMod.Clear();
 
             SaveManager saveManager = AllGameManagers.Instance.GetSaveManager();
             RelicManager relicManager = AllGameManagers.Instance.GetRelicManager();
@@ -56,6 +57,8 @@ namespace Patty_CardPicker_MOD
                 for (int i = 0; i < cardEntry.Value.Value; i++)
                 {
                     CardState cardState = saveManager.AddCardToDeck(cardData, null, true);
+                    Plugin.CardsAddedByThisMod.Add(cardState);
+
                     relicManager.ApplyStartingUpgradeToDraftCard(cardState, false);
 
                     if (enhancerPool != null)
@@ -77,6 +80,7 @@ namespace Patty_CardPicker_MOD
                 }
             }
         }
+
         [HarmonyPostfix, HarmonyPatch(typeof(LoadScreen), "StartLoadingScreen")]
         public static void StartLoadingScreen(LoadScreen __instance, ref ScreenManager.ScreenActiveCallback ___screenActiveCallback)
         {
@@ -99,6 +103,29 @@ namespace Patty_CardPicker_MOD
                     CardSelectionDialog.Instance.name = nameof(CardSelectionDialog);
                     CardSelectionDialog.Instance.Setup();
                     UnityEngine.Object.DestroyImmediate(clonedDialog.gameObject.GetComponent<MutatorSelectionDialog>());
+                };
+            }
+            else if (__instance.name == ScreenName.Map)
+            {
+                SaveManager saveManager = AllGameManagers.Instance.GetSaveManager();
+                if (!Plugin.RemoveStartingDeck.Value ||
+                    saveManager.GetGameSequence() != SaveData.GameSequence.Initial)
+                {
+                    Plugin.CardsAddedByThisMod.Clear();
+                    return;
+                }
+                ___screenActiveCallback += delegate (IScreen screen)
+                {
+                    foreach (CardState cardState in saveManager.GetDeckState().ToList())
+                    {
+                        if (Plugin.CardsAddedByThisMod.Contains(cardState) ||
+                            cardState.IsChampionCard())
+                        {
+                            continue;
+                        }
+                        saveManager.RemoveCardFromDeck(cardState);
+                    }
+                    Plugin.CardsAddedByThisMod.Clear();
                 };
             }
         }

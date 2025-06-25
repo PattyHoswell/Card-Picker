@@ -80,6 +80,7 @@ namespace Patty_CardPicker_MOD
         internal void Set(CardData data, CardSelectionDialog cardSelectionDialog)
         {
             Setup();
+            name = data.GetName();
             Data = data;
             selectionDialog = cardSelectionDialog;
             cardState = new CardState(Data, AllGameManagers.Instance.GetSaveManager(), true);

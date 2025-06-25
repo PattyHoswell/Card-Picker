@@ -78,6 +78,10 @@
   <ItemGroup>
     <Compile Include="CardButtonUI.cs" />
     <Compile Include="ConfigurationManagerAttributes.cs" />
+    <Compile Include="ModButtonInfo.cs" />
+    <Compile Include="ModButtonTooltip.cs" />
+    <Compile Include="ModButtonUI.cs" />
+    <Compile Include="ModOptionDialog.cs" />
     <Compile Include="PatchList.cs" />
     <Compile Include="Plugin.cs" />
     <Compile Include="PluginInfo.cs" />
