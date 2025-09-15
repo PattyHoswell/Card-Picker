@@ -2,10 +2,6 @@
 using HarmonyLib;
 using ShinyShoe;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -81,6 +77,14 @@ namespace Patty_CardPicker_MOD
             gameObject.SetActive(true);
         }
 
+        private void OnDestroy()
+        {
+            if (info.entry != null)
+            {
+                info.entry.SettingChanged -= Entry_SettingChanged;
+            }
+        }
+
         private void Entry_SettingChanged(object sender, EventArgs e)
         {
             var eventArgs = (SettingChangedEventArgs)e;
@@ -125,11 +129,12 @@ namespace Patty_CardPicker_MOD
             bg.color = Color.clear;
 
             var toggleButton = Instantiate(FindObjectOfType<GameUISelectableToggle>(true), background.transform);
+            toggleButton.gameObject.SetActive(true);
             toggleButton.name = "Option Toggle";
             toggleButton.onClick = new Button.ButtonClickedEvent();
             toggleButton.transform.GetChild(0).gameObject.SetActive(false);
             toggleButton.transform.GetChild(2).gameObject.SetActive(false);
-            toggleButton.transform.localPosition = new Vector2(62, 55);
+            toggleButton.transform.localPosition = new Vector2(-106, 55);
             modButtonUI.toggleButton = toggleButton;
 
             var toggleRT = toggleButton.GetComponent<RectTransform>();

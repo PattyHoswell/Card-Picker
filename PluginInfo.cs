@@ -1,15 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Patty_CardPicker_MOD
+﻿namespace Patty_CardPicker_MOD
 {
     public static class PluginInfo
     {
         public const string GUID = "Patty_CardPicker_MOD";
         public const string Name = "Card Picker";
-        public const string Version = "2.0.0";
+        public const string Version = "2.0.1";
     }
 }

@@ -1,18 +1,14 @@
-﻿using BepInEx;
+﻿using BepInEx.Configuration;
+using HarmonyLib;
+using I2.Loc;
 using ShinyShoe;
-using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using BepInEx.Configuration;
-using TMPro;
-using I2.Loc;
-using System.Collections;
-using System.Collections.Specialized;
-using HarmonyLib;
 
 namespace Patty_CardPicker_MOD
 {
@@ -423,7 +419,7 @@ namespace Patty_CardPicker_MOD
             preview.gameObject.AddComponent<VerticalLayoutGroup>();
 
             var ogDropdown = FindObjectOfType<GameUISelectableDropdown>(true);
-            GameUISelectableDropdown CreateDropdownWithOptions(OrderedDictionary translatedTerms = null, 
+            GameUISelectableDropdown CreateDropdownWithOptions(OrderedDictionary translatedTerms = null,
                                                                HashSet<string> customOptions = null)
             {
                 var dropdown = Instantiate(ogDropdown, preview);
@@ -473,6 +469,28 @@ namespace Patty_CardPicker_MOD
             var factionDropdown = CreateDropdownWithOptions(customOptions: FactionNames);
             var cardTypeDropdown = CreateDropdownWithOptions(Plugin.CardTypeTranslationTerm);
             var cardRarityDropdown = CreateDropdownWithOptions(Plugin.CardRarityTranslationTerm);
+
+
+            // Honestly there should be a better way of doing this than having to write it manually
+            // But I'm not gonna bother spending more time on it as there will only be like 3 dropdown anyways
+            factionDropdown.onClick.AddListener(() =>
+            {
+                cardTypeDropdown.Close();
+                cardRarityDropdown.Close();
+            });
+
+            cardTypeDropdown.onClick.AddListener(() =>
+            {
+                factionDropdown.Close();
+                cardRarityDropdown.Close();
+            });
+
+            cardRarityDropdown.onClick.AddListener(() =>
+            {
+                factionDropdown.Close();
+                cardTypeDropdown.Close();
+            });
+
             yield return null;
             SetupDropdownButtonListeners(factionDropdown);
             SetupDropdownButtonListeners(cardTypeDropdown);
@@ -541,7 +559,7 @@ namespace Patty_CardPicker_MOD
         {
             UpdateTooltipPosition();
         }
-        
+
         void UpdateTooltipPosition()
         {
             if (focusedButton == null)

@@ -1,14 +1,8 @@
-﻿using BepInEx.Configuration;
-using BepInEx.Logging;
-using HarmonyLib;
+﻿using HarmonyLib;
 using ShinyShoe;
 using ShinyShoe.Loading;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using UnityEngine;
 
 namespace Patty_CardPicker_MOD
 {
@@ -23,13 +17,18 @@ namespace Patty_CardPicker_MOD
         [HarmonyPostfix, HarmonyPatch(typeof(GameStateManager), nameof(GameStateManager.StartGame))]
         public static void StartGame(RunType runType)
         {
-            if (runType == RunType.MalickaChallenge && 
+            if (runType == RunType.MalickaChallenge &&
                 !Plugin.EnableOnChallenge.Value)
             {
                 return;
             }
             Plugin.CardsAddedByThisMod.Clear();
 
+            AddCards();
+        }
+
+        private static void AddCards()
+        {
             SaveManager saveManager = AllGameManagers.Instance.GetSaveManager();
             RelicManager relicManager = AllGameManagers.Instance.GetRelicManager();
 
@@ -41,7 +40,6 @@ namespace Patty_CardPicker_MOD
                 }
 
                 CardData cardData = cardEntry.Key;
-
                 /* You can enable this if you want. In my case I can't.
                  * Because what if it tries to add a card that can't be shown in the LogBook.
                  * There's too much to consider for this to be worth it for such little value.
@@ -50,8 +48,8 @@ namespace Patty_CardPicker_MOD
 
                 var mainClass = saveManager.GetMainClass();
                 var subClass = saveManager.GetSubClass();
-                var enhancerPool = mainClass.GetRandomDraftEnhancerPool() != null ? 
-                                   mainClass.GetRandomDraftEnhancerPool() : 
+                var enhancerPool = mainClass.GetRandomDraftEnhancerPool() != null ?
+                                   mainClass.GetRandomDraftEnhancerPool() :
                                    subClass.GetRandomDraftEnhancerPool();
 
                 for (int i = 0; i < cardEntry.Value.Value; i++)
@@ -72,7 +70,7 @@ namespace Patty_CardPicker_MOD
 
                             var cardUpgrade = new CardUpgradeState();
                             cardUpgrade.Setup(upgradeData);
-                            cardState.Upgrade(cardUpgrade, saveManager, true);
+                            cardState.ApplyPermanentUpgrade(cardUpgrade, saveManager, true);
                         }
                     }
 
