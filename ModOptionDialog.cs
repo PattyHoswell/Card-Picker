@@ -1,16 +1,11 @@
-﻿using BepInEx;
+﻿using BepInEx.Bootstrap;
 using I2.Loc;
 using ShinyShoe;
-using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-
 namespace Patty_CardPicker_MOD
 {
     internal class ModOptionDialog : MonoBehaviour
@@ -77,6 +72,11 @@ namespace Patty_CardPicker_MOD
                 var modButton = Instantiate(layout, scrollRect.content);
                 modButton.modDialog = this;
                 modButton.Set(buttonInfo);
+                if (Chainloader.PluginInfos.ContainsKey("Patty_SoundChanger_MOD"))
+                {
+                    var xOffset = -357;
+                    modButton.toggleButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(xOffset, 7);
+                }
                 modButtons.Add(modButton);
             }
             ResetOrder();
@@ -111,7 +111,7 @@ namespace Patty_CardPicker_MOD
         private void ResetOrder()
         {
             modButtons = modButtons.OrderBy(modButton => modButton.info.text).ToList();
-            for (var i = 0; i <  modButtons.Count; i++)
+            for (var i = 0; i < modButtons.Count; i++)
             {
                 var button = modButtons[i];
                 button.transform.SetSiblingIndex(i);

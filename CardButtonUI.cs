@@ -1,19 +1,10 @@
-﻿using BepInEx;
+﻿using BepInEx.Configuration;
 using HarmonyLib;
-using ShinyShoe;
-using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
-using BepInEx.Configuration;
 
 namespace Patty_CardPicker_MOD
 {
@@ -83,7 +74,12 @@ namespace Patty_CardPicker_MOD
             name = data.GetName();
             Data = data;
             selectionDialog = cardSelectionDialog;
-            cardState = new CardState(Data, AllGameManagers.Instance.GetSaveManager(), true);
+
+            cardState = CardStateHelper.CreateCardStateFromData(data, startingModifiers: null, applyExistingRelicModifiers: false,
+                                                                setupStartingUpgrades: false, setPurified: false,
+                                                                AllGameManagers.Instance.GetRelicManager(),
+                                                                AllGameManagers.Instance.GetSaveManager(),
+                                                                AllGameManagers.Instance.GetAllGameData());
             cardState.RefetchAssets(Data);
             cardState.RefreshCardBodyTextLocalization();
             cardUI.SetCardVisibleAndInteractable();

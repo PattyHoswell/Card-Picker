@@ -134,12 +134,13 @@ namespace Patty_CardPicker_MOD
             toggleButton.onClick = new Button.ButtonClickedEvent();
             toggleButton.transform.GetChild(0).gameObject.SetActive(false);
             toggleButton.transform.GetChild(2).gameObject.SetActive(false);
-            toggleButton.transform.localPosition = new Vector2(-106, 55);
             modButtonUI.toggleButton = toggleButton;
 
             var toggleRT = toggleButton.GetComponent<RectTransform>();
-            toggleRT.anchoredPosition = new Vector2(toggleRT.anchoredPosition.x, 7);
-            toggleRT.pivot = new Vector2(0.2f, 1);
+            toggleRT.anchorMax = Vector2.one;
+            toggleRT.anchorMin = Vector2.zero;
+            toggleRT.pivot = Vector2.one * 0.5f;
+            toggleRT.anchoredPosition = new Vector2(146, 7);
             return modButtonUI;
         }
     }
