@@ -148,6 +148,7 @@ namespace Patty_CardPicker_MOD
         {
             Transform swapChampButton = uiFooter.transform.Find("Swap Champion Button");
             Transform starterCardsButton = Instantiate(swapChampButton, uiFooter.transform);
+            starterCardsButton.gameObject.SetActive(true);
 
             var starterLabel = starterCardsButton.Find("Label").GetComponent<TextMeshProUGUI>();
             DestroyImmediate(starterLabel.GetComponent<Localize>());

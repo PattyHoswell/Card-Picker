@@ -1,8 +1,10 @@
 ﻿using HarmonyLib;
 using ShinyShoe;
 using ShinyShoe.Loading;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using UnityEngine.SceneManagement;
 
 namespace Patty_CardPicker_MOD
 {
@@ -79,6 +81,38 @@ namespace Patty_CardPicker_MOD
             }
         }
 
+        public static IEnumerator LoadRunSetupScreenCoroutine(SoulSaviorRunSetupScreen saviourRunScreen)
+        {
+            yield return null;
+            if (SceneManager.GetSceneByName("run_setup").isLoaded == false)
+            {
+                SceneManager.LoadScene("run_setup", LoadSceneMode.Additive);
+            }
+            yield return null;
+            yield return null;
+
+            RunSetupScreen runSetupScreen = (RunSetupScreen)AllGameManagers.Instance.GetScreenManager().GetScreen(ScreenName.RunSetup);
+
+            var mutatorSelectionDialog = (MutatorSelectionDialog)AccessTools.Field(typeof(RunSetupScreen), "mutatorSelectionDialog")
+                                                                            .GetValue(runSetupScreen);
+            if (mutatorSelectionDialog == null)
+            {
+                Plugin.LogSource.LogError("Oh no!");
+                yield break;
+            }
+
+            var clonedDialog = UnityEngine.Object.Instantiate(mutatorSelectionDialog, saviourRunScreen.transform);
+            CardSelectionDialog.Instance = clonedDialog.gameObject.AddComponent<CardSelectionDialog>();
+            CardSelectionDialog.Instance.name = nameof(CardSelectionDialog);
+            CardSelectionDialog.Instance.Setup();
+            UnityEngine.Object.DestroyImmediate(clonedDialog.gameObject.GetComponent<MutatorSelectionDialog>());
+
+            yield return null;
+            yield return SceneManager.UnloadSceneAsync("run_setup");
+            yield return null;
+            AllGameManagers.Instance.GetScreenManager().SetScreenActive(ScreenName.SoulSaviorRunSetup, true);
+        }
+
         [HarmonyPostfix, HarmonyPatch(typeof(LoadScreen), "StartLoadingScreen")]
         public static void StartLoadingScreen(LoadScreen __instance, ref ScreenManager.ScreenActiveCallback ___screenActiveCallback)
         {
@@ -103,7 +137,18 @@ namespace Patty_CardPicker_MOD
                     UnityEngine.Object.DestroyImmediate(clonedDialog.gameObject.GetComponent<MutatorSelectionDialog>());
                 };
             }
-            else if (__instance.name == ScreenName.Map)
+            else if (__instance.name == ScreenName.SoulSaviorRunSetup)
+            {
+                ___screenActiveCallback += delegate (IScreen screen)
+                {
+                    var saviourRunScreen = (SoulSaviorRunSetupScreen)screen;
+
+                    SceneManager.LoadScene("run_setup", LoadSceneMode.Additive);
+
+                    saviourRunScreen.StartCoroutine(LoadRunSetupScreenCoroutine(saviourRunScreen));
+                };
+            }
+            else if (__instance.name == ScreenName.Map || __instance.name == ScreenName.SoulSaviorMap)
             {
                 SaveManager saveManager = AllGameManagers.Instance.GetSaveManager();
                 if (!Plugin.RemoveStartingDeck.Value ||
