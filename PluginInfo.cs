@@ -4,6 +4,6 @@
     {
         public const string GUID = "Patty_CardPicker_MOD";
         public const string Name = "Card Picker";
-        public const string Version = "2.1.0";
+        public const string Version = "2.2.0";
     }
 }

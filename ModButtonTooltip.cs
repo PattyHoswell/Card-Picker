@@ -1,10 +1,4 @@
-﻿using HarmonyLib;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using TMPro;
+﻿using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -51,9 +45,7 @@ namespace Patty_CardPicker_MOD
             sizeFitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
             sizeFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-            var runSetupScreen = (RunSetupScreen)AllGameManagers.Instance.GetScreenManager().GetScreen(ScreenName.RunSetup);
-            var championNameRoot = (TextMeshProUGUI)AccessTools.Field(typeof(RunSetupScreen), "championNameLabel").GetValue(runSetupScreen);
-            label = Instantiate(championNameRoot, transform);
+            label = Instantiate(PatchList.championNameLabelPrefab, transform);
             label.fontSizeMax = 30;
             label.fontSizeMin = label.fontSizeMax;
             label.fontSize = label.fontSizeMax;

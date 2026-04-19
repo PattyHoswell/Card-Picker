@@ -17,7 +17,6 @@ namespace Patty_CardPicker_MOD
         TextMeshProUGUI title, warning;
         bool initialized;
         internal ScrollRect scrollRect;
-        internal CardSelectionDialog cardSelectionDialog;
         internal ModButtonTooltip modTooltip;
         internal static Sprite tooltipSprite;
         void Awake()
@@ -47,7 +46,7 @@ namespace Patty_CardPicker_MOD
         {
             Setup();
             dialog.SetActive(false, gameObject);
-            cardSelectionDialog.bg.color = CardSelectionDialog.BGColor;
+            CardSelectionDialog.Instance.bg.color = CardSelectionDialog.BGColor;
         }
 
         // Many failsafe check in case the menu is trying to open without being initialized
@@ -67,6 +66,12 @@ namespace Patty_CardPicker_MOD
             SetupModButtonTemplate();
             SetupCloseButton();
 
+            ResetOrder();
+            modTooltip = CreateTooltip();
+        }
+
+        internal void CreateAllEntry()
+        {
             foreach (ModButtonInfo buttonInfo in CreateModButtons())
             {
                 var modButton = Instantiate(layout, scrollRect.content);
@@ -79,8 +84,6 @@ namespace Patty_CardPicker_MOD
                 }
                 modButtons.Add(modButton);
             }
-            ResetOrder();
-            modTooltip = CreateTooltip();
         }
 
         private ModButtonTooltip CreateTooltip()
@@ -124,11 +127,11 @@ namespace Patty_CardPicker_MOD
             yield return new ModButtonInfo(Plugin.EnableOnChallenge, 25);
             yield return new ModButtonInfo(Plugin.ShowAllCards, 25, delegate (bool toggled)
             {
-                if (cardSelectionDialog == null)
+                if (CardSelectionDialog.Instance == null)
                 {
                     return;
                 }
-                cardSelectionDialog.RefreshCards();
+                CardSelectionDialog.Instance.RefreshCards();
             });
         }
 
@@ -143,7 +146,10 @@ namespace Patty_CardPicker_MOD
         {
             Transform originalCloseButton = transform.Find("Dialog/CloseButton");
             DestroyImmediate(originalCloseButton.GetComponent<GameUISelectableButton>());
-            DestroyImmediate(scrollRect.content.GetChild(0).gameObject);
+            foreach (Transform content in scrollRect.content)
+            {
+                DestroyImmediate(content.gameObject);
+            }
         }
 
         private void SetupTitleAndWarning()
@@ -158,6 +164,8 @@ namespace Patty_CardPicker_MOD
             DestroyImmediate(warning.GetComponent<Localize>());
             warning.text = "Some options might requires you to re-open the menu for it to take effect. " +
                            "Hover into the option to view the description.";
+
+            instructions.parent.Find("Mutators preview").gameObject.SetActive(false);
         }
 
         private void SetupGridLayout()
@@ -170,7 +178,17 @@ namespace Patty_CardPicker_MOD
 
         private void SetupModButtonTemplate()
         {
-            layout = ModButtonUI.CreateModButtonUI(transform, new ModButtonInfo("Placeholder"));
+            if (PatchList.modButtonPrefab == null)
+            {
+                PatchList.modButtonPrefab = ModButtonUI.CreateModButtonUI(null, new ModButtonInfo("Placeholder"));
+                GameObject.DontDestroyOnLoad(PatchList.modButtonPrefab.gameObject);
+            }
+            if (PatchList.modButtonPrefab == null)
+            {
+                Plugin.LogSource.LogError("Failed to create mod button prefab");
+                return;
+            }
+            layout = Instantiate(PatchList.modButtonPrefab, transform);
             layout.name = $"{nameof(ModButtonUI)} Prefab";
             layout.transform.localScale = Vector3.one;
             layout.gameObject.SetActive(false);
@@ -179,7 +197,7 @@ namespace Patty_CardPicker_MOD
         private void SetupCloseButton()
         {
             Transform originalCloseButton = transform.Find("Dialog/CloseButton");
-            closeButton = originalCloseButton.gameObject.AddComponent<Button>();
+            closeButton = originalCloseButton.gameObject.AddOrGetComponent<Button>();
             closeButton.targetGraphic = closeButton.transform.Find("Target Graphic").GetComponent<Image>();
             closeButton.gameObject.SetActive(true);
             closeButton.onClick = new Button.ButtonClickedEvent();

@@ -1,5 +1,4 @@
 ﻿using BepInEx.Configuration;
-using HarmonyLib;
 using I2.Loc;
 using ShinyShoe;
 using System.Collections;
@@ -65,6 +64,7 @@ namespace Patty_CardPicker_MOD
 
             transform.SetAsLastSibling();
             dialog.SetActive(true, gameObject);
+            bg.color = BGColor;
         }
         internal void ResetOrder()
         {
@@ -106,7 +106,6 @@ namespace Patty_CardPicker_MOD
             InitializeBasicComponents();
             SetupDialogAndScrollView();
             SetupTitleAndWarning();
-            SetupStarterCardsButton(uiFooter);
             SetupCardGridLayout();
             SetupCardPreviewTemplate();
             SetupCloseButton();
@@ -126,7 +125,10 @@ namespace Patty_CardPicker_MOD
         {
             Transform originalCloseButton = transform.Find("Dialog/CloseButton");
             DestroyImmediate(originalCloseButton.GetComponent<GameUISelectableButton>());
-            DestroyImmediate(scrollRect.content.GetChild(0).gameObject);
+            foreach (Transform transform in scrollRect.content)
+            {
+                DestroyImmediate(transform.gameObject);
+            }
         }
 
         private void SetupTitleAndWarning()
@@ -144,26 +146,6 @@ namespace Patty_CardPicker_MOD
                            "right click to decrease.";
         }
 
-        private void SetupStarterCardsButton(UIFooter uiFooter)
-        {
-            Transform swapChampButton = uiFooter.transform.Find("Swap Champion Button");
-            Transform starterCardsButton = Instantiate(swapChampButton, uiFooter.transform);
-            starterCardsButton.gameObject.SetActive(true);
-
-            var starterLabel = starterCardsButton.Find("Label").GetComponent<TextMeshProUGUI>();
-            DestroyImmediate(starterLabel.GetComponent<Localize>());
-            starterLabel.fontSizeMin = starterLabel.fontSizeMax;
-            starterLabel.fontSize = starterLabel.fontSizeMax;
-            starterLabel.text = "Set Starter Cards";
-
-            starterCardsButton.GetComponent<GameUISelectableButton>().onClick.AddListener(() =>
-            {
-                SoundManager.PlaySfxSignal.Dispatch("UI_Click");
-                enabled = true;
-                gameObject.SetActive(true);
-            });
-        }
-
         private void SetupCardGridLayout()
         {
             var contentGroup = scrollRect.content.GetComponent<GridLayoutGroup>();
@@ -175,15 +157,19 @@ namespace Patty_CardPicker_MOD
         {
             var clonedCardPreview = Instantiate(FindObjectOfType<CardUI>(), transform);
             clonedCardPreview.name = "CardUIPrefab";
-            layout = clonedCardPreview.gameObject.AddComponent<CardButtonUI>();
+            layout = clonedCardPreview.gameObject.AddOrGetComponent<CardButtonUI>();
             layout.transform.localScale = Vector3.one;
             layout.gameObject.SetActive(false);
         }
 
         private void SetupCloseButton()
         {
+            if (closeButton != null)
+            {
+                return;
+            }
             Transform originalCloseButton = transform.Find("Dialog/CloseButton");
-            closeButton = originalCloseButton.gameObject.AddComponent<Button>();
+            closeButton = originalCloseButton.gameObject.AddOrGetComponent<Button>();
             closeButton.targetGraphic = closeButton.transform.Find("Target Graphic").GetComponent<Image>();
             closeButton.gameObject.SetActive(true);
             closeButton.onClick = new Button.ButtonClickedEvent();
@@ -196,6 +182,10 @@ namespace Patty_CardPicker_MOD
 
         private void SetupResetButton(UIFooter uiFooter)
         {
+            transform.DestroyGameObject("Reset Button");
+            transform.DestroyGameObject("Reset All Button");
+            transform.DestroyGameObject("Tooltips");
+
             Button resetButton = Instantiate(closeButton, transform);
             resetButton.name = "Reset Button";
             resetButton.transform.localPosition = new Vector2(0, -460);
@@ -247,16 +237,20 @@ namespace Patty_CardPicker_MOD
                 ResetAllCardCounts();
             });
 
-
-            var runSetupScreen = (RunSetupScreen)AllGameManagers.Instance.GetScreenManager().GetScreen(ScreenName.RunSetup);
-            var mutatorSelectionDialog = (MutatorSelectionDialog)AccessTools.Field(typeof(RunSetupScreen), "mutatorSelectionDialog")
-                                                                            .GetValue(runSetupScreen);
-            var clonedDialog = Instantiate(mutatorSelectionDialog, mutatorSelectionDialog.transform.parent.parent);
-            var modOptionDialog = clonedDialog.gameObject.AddComponent<ModOptionDialog>();
-            modOptionDialog.cardSelectionDialog = this;
+            SetupAdvancedButton();
+        }
+        internal void SetupAdvancedButton()
+        {
+            if (PatchList.modOptionDialogPrefab == null)
+            {
+                return;
+            }
+            var clonedDialog = Instantiate(PatchList.modOptionDialogPrefab, CardSelectionDialog.Instance.transform.parent);
+            var modOptionDialog = clonedDialog.gameObject.AddOrGetComponent<ModOptionDialog>();
             modOptionDialog.Setup();
+            modOptionDialog.CreateAllEntry();
 
-            var advanced = Instantiate(resetButton, transform);
+            var advanced = Instantiate(transform.Find("Reset Button").GetComponent<Button>(), transform);
             advanced.name = "Advanced Button";
             advanced.transform.localPosition = new Vector2(500, -460);
             advanced.transform.Find("Label").GetComponent<TextMeshProUGUI>().text = "Options";
@@ -270,6 +264,7 @@ namespace Patty_CardPicker_MOD
                 modOptionDialog.Open();
             });
         }
+
         private void SetupOptions()
         {
             var orderedClassTerms = Plugin.ClanNameTranslationTerm.Keys.Cast<string>().ToList();
@@ -417,7 +412,7 @@ namespace Patty_CardPicker_MOD
                 Destroy(transform.gameObject);
             }
             DestroyImmediate(preview.GetComponent<HorizontalLayoutGroup>());
-            preview.gameObject.AddComponent<VerticalLayoutGroup>();
+            preview.gameObject.AddOrGetComponent<VerticalLayoutGroup>();
 
             var ogDropdown = FindObjectOfType<GameUISelectableDropdown>(true);
             GameUISelectableDropdown CreateDropdownWithOptions(OrderedDictionary translatedTerms = null,
@@ -448,7 +443,11 @@ namespace Patty_CardPicker_MOD
                 dropdown.onClick.AddListener(delegate ()
                 {
                     InputManager.Inst.TryGetSignaledInputMapping(InputManager.Controls.Submit, out CoreInputControlMapping mapping);
-                    dropdown.ApplyScreenInput(mapping, dropdown, InputManager.Controls.Submit);
+                    try
+                    {
+                        dropdown.ApplyScreenInput(mapping, dropdown, InputManager.Controls.Submit);
+                    }
+                    catch { }
                 });
                 return dropdown;
             }
@@ -463,7 +462,11 @@ namespace Patty_CardPicker_MOD
                     button.onClick.AddListener(delegate ()
                     {
                         InputManager.Inst.TryGetSignaledInputMapping(InputManager.Controls.Submit, out CoreInputControlMapping mapping);
-                        targetDropdown.ApplyScreenInput(mapping, button, InputManager.Controls.Submit);
+                        try
+                        {
+                            targetDropdown.ApplyScreenInput(mapping, button, InputManager.Controls.Submit);
+                        }
+                        catch { }
                     });
                 }
             }
@@ -589,6 +592,10 @@ namespace Patty_CardPicker_MOD
                 offset = new Vector2(1020, -550);
             }
             focusedTooltipRectTransform.anchoredPosition = localPos + offset;
+        }
+        internal void Update()
+        {
+            bg.color = BGColor;
         }
     }
 }

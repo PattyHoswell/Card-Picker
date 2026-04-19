@@ -49,6 +49,11 @@ namespace Patty_CardPicker_MOD
                 toggleButton = transform.GetChild(2).GetComponent<GameUISelectableToggle>();
             }
         }
+        public void Update()
+        {
+            toggleButton.GetComponent<RectTransform>().localPosition = new Vector2(-228, 7);
+        }
+
         internal void Set(ModButtonInfo info)
         {
             if (info.entry == null)
